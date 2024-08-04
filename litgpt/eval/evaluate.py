@@ -38,6 +38,7 @@ def convert_and_evaluate(
     seed: int = 1234,
     save_filepath: Optional[Path] = None,
     access_token: Optional[str] = None,
+    no_conversion: bool = False,
 ) -> None:
     """Evaluate a model with the LM Evaluation Harness.
 
@@ -90,7 +91,7 @@ def convert_and_evaluate(
     save_filepath = out_dir / Path("results.json") if save_filepath is None else Path(save_filepath)
 
     model_path = out_dir / "pytorch_model.bin"
-    if not model_path.exists() or force_conversion:
+    if (not model_path.exists() and not no_conversion) or force_conversion:
         copy_config_files(source_dir=checkpoint_dir, out_dir=out_dir)
         convert_lit_checkpoint(checkpoint_dir=checkpoint_dir, output_dir=out_dir)
 
@@ -101,9 +102,12 @@ def convert_and_evaluate(
         torch.save(state_dict, model_path)
         os.remove(out_dir / "model.pth")
 
-    from lm_eval.models.huggingface import HFLM
-
-    model = HFLM(pretrained=str(out_dir.resolve()), device=device, batch_size=batch_size, dtype=dtype)
+    if no_conversion:
+        from litgpt.eval.lit import LitLM
+        model = LitLM(checkpoint_dir)
+    else:
+        from lm_eval.models.huggingface import HFLM
+        model = HFLM(pretrained=str(out_dir.resolve()), device=device, batch_size=batch_size, dtype=dtype)
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
